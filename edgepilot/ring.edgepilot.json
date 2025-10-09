@@ -1,0 +1,111 @@
+{
+  "datasource": { "type": "prometheus", "base_url": "http://localhost:9090" },
+  "entities": [
+    {
+      "name": "Host",
+      "nicename": ["Host","Hosts"],
+      "identifier": { "labels": ["instance"], "type": "Identifier" },
+      "attributes": [
+        {
+          "name": "cpu_utilization_pct",
+          "nicename": ["CPU utilization"],
+          "type": ["Metric","Arithmetic"],
+          "units": "percent",
+          "promql": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}[5m])))"
+        },
+        {
+          "name": "mem_used_pct",
+          "nicename": ["Memory used percent"],
+          "type": ["Metric","Arithmetic"],
+          "units": "percent",
+          "promql": "100 * (1 - node_memory_MemAvailable_bytes{job=\"node-exporter\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"})"
+        },
+        {
+          "name": "load1",
+          "nicename": ["1m load average"],
+          "type": ["Metric","Arithmetic"],
+          "units": "load",
+          "promql": "node_load1{job=\"node-exporter\"}"
+        }
+      ]
+    },
+    {
+      "name": "Filesystem",
+      "nicename": ["Filesystem","Filesystems"],
+      "identifier": { "labels": ["instance","mountpoint","device"], "type": "Identifier" },
+      "attributes": [
+        {
+          "name": "used_pct",
+          "nicename": ["Disk used percent"],
+          "type": ["Metric","Arithmetic"],
+          "units": "percent",
+          "promql": "100 * (1 - node_filesystem_free_bytes{job=\"node-exporter\",fstype!~\"tmpfs|overlay\"} / node_filesystem_size_bytes{job=\"node-exporter\",fstype!~\"tmpfs|overlay\"})"
+        },
+        {
+          "name": "free_bytes",
+          "nicename": ["Disk free bytes"],
+          "type": ["Metric","Arithmetic"],
+          "units": "bytes",
+          "promql": "node_filesystem_free_bytes{job=\"node-exporter\",fstype!~\"tmpfs|overlay\"}"
+        }
+      ]
+    },
+    {
+      "name": "NetworkInterface",
+      "nicename": ["Network interface","Network interfaces"],
+      "identifier": { "labels": ["instance","device"], "type": "Identifier" },
+      "attributes": [
+        {
+          "name": "rx_bytes_per_s",
+          "nicename": ["Receive rate"],
+          "type": ["Metric","Arithmetic"],
+          "units": "bytes_per_second",
+          "promql": "rate(node_network_receive_bytes_total{job=\"node-exporter\"}[5m])"
+        },
+        {
+          "name": "tx_bytes_per_s",
+          "nicename": ["Transmit rate"],
+          "type": ["Metric","Arithmetic"],
+          "units": "bytes_per_second",
+          "promql": "rate(node_network_transmit_bytes_total{job=\"node-exporter\"}[5m])"
+        }
+      ]
+    },
+    {
+      "name": "Container",
+      "nicename": ["Container","Containers"],
+      "identifier": { "labels": ["instance","id"], "type": "Identifier" },
+      "attributes": [
+        {
+          "name": "cpu_seconds_per_s",
+          "nicename": ["Container CPU rate"],
+          "type": ["Metric","Arithmetic"],
+          "units": "cpu_seconds_per_second",
+          "promql": "sum by (instance,id) (rate(container_cpu_usage_seconds_total{job=\"cadvisor\", id=~\"/docker/.+\"}[5m]))"
+        },
+        {
+          "name": "mem_working_set_bytes",
+          "nicename": ["Container memory working set"],
+          "type": ["Metric","Arithmetic"],
+          "units": "bytes",
+          "promql": "max by (instance,id) (container_memory_working_set_bytes{job=\"cadvisor\", id=~\"/docker/.+\"})"
+        },
+        {
+          "name": "rx_bytes_per_s",
+          "nicename": ["Container receive rate"],
+          "type": ["Metric","Arithmetic"],
+          "units": "bytes_per_second",
+          "promql": "sum by (instance,id) (rate(container_network_receive_bytes_total{job=\"cadvisor\", id=~\"/docker/.+\"}[5m]))"
+        },
+        {
+          "name": "tx_bytes_per_s",
+          "nicename": ["Container transmit rate"],
+          "type": ["Metric","Arithmetic"],
+          "units": "bytes_per_second",
+          "promql": "sum by (instance,id) (rate(container_network_transmit_bytes_total{job=\"cadvisor\", id=~\"/docker/.+\"}[5m]))"
+        }
+      ]
+    }
+  ],
+  "relationships": []
+}

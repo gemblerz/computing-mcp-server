@@ -1,0 +1,46 @@
+{
+  "report": "edge_status",
+  "description": "Snapshot of key host, filesystem, and container health derived from Prometheus metrics.",
+  "plans": [
+    {
+      "entity": "Host",
+      "attribute": "cpu_utilization_pct",
+      "template": "TREND",
+      "statement": "Average host CPU usage over {range} is {value:.1f}%."
+    },
+    {
+      "entity": "Host",
+      "attribute": "mem_used_pct",
+      "template": "TREND",
+      "statement": "Average host memory usage over {range} is {value:.1f}%."
+    },
+    {
+      "entity": "Host",
+      "attribute": "load1",
+      "template": "TREND",
+      "statement": "Mean host 1m load during {range} is {value:.2f}."
+    },
+    {
+      "entity": "Container",
+      "attribute": "cpu_seconds_per_s",
+      "template": "RANKING",
+      "statement": "Top {k} containers by CPU consumption: {items}.",
+      "k": 5
+    },
+    {
+      "entity": "Container",
+      "attribute": "mem_working_set_bytes",
+      "template": "RANKING",
+      "statement": "Top {k} containers by memory working set: {items}.",
+      "k": 5
+    },
+    {
+      "entity": "Filesystem",
+      "attribute": "used_pct",
+      "template": "THRESHOLD",
+      "statement": "Filesystems above 80% utilization: {items}.",
+      "operator": ">",
+      "value": 80
+    }
+  ]
+}

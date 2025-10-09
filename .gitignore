@@ -1,0 +1,12 @@
+# General
+.DS_Store
+__pycache__/
+*.pyc
+.streamlit/
+.venv/
+edgepilot/.venv/
+.env
+
+# EdgePilot artifacts
+edgepilot/edgepilot_mcp.log
+edgepilot/*.log
