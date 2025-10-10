@@ -4,41 +4,48 @@
 
 ## Layers
 
-### User Side
-- **Usage Alerts**: trigger install or follow-up investigations.
-- **Install Wizard**: guides through LLM selection (Claude), cluster/local install, and access requirements.
-- **Prompts**: natural-language questions typed into the UI/CLI.
+### 1. User Side
+- **Install Wizard** collects deployment choices (Claude model, cluster vs. local, access) and lights up the Streamlit UI.
+- **Prompts** capture ad-hoc questions after setup; every prompt becomes an input for the planner.
 
-### Frontend (Streamlit UI / CLI)
-- Collects user questions, displays responses, recommended actions, and raw facts.
-- Tracks LLM usage, latency, and alerting metrics.
+### 2. Frontend (Streamlit UI / CLI)
+- Orchestrates the human loop: sends questions to the planner, renders plan JSON, raw facts, and summarized answers.
+- Surfaces LLM usage/performance metrics emitted by the planner and summarizer alongside alert banners from the backend.
 
-### Planner (Claude)
-- Converts questions into structured JSON actions (`report`, `can_run`, `suggest_window`, `run_task`, etc.).
-- Ensures output schema compliance before handing off to EdgePilot API.
+### 3. Planner (Claude)
+- Translates natural language into strongly-typed plan JSON (`report`, `can_run`, `suggest_window`, `run_task`, etc.).
+- Validates schema compliance before the plan is returned to the UI and relayed to the API.
+- Emits latency, token, and error telemetry that feeds the LLM performance dashboard.
 
-### Backend
-- **FastAPI (`edgepilot.app`)** loads the ring/blueprint metadata, composes PromQL, and orchestrates task execution.
-- **Metric Reporting** surfaces API health, execution duration, and scheduling outcomes back to the UI.
+### 4. Backend
+- **FastAPI (`edgepilot.app`)** materializes plan steps: composes PromQL, coordinates task execution, and persists run context.
+- **Metric Reporting** aggregates resource usage and emits alerts when thresholds are exceeded.
+- **Usage Alerts** are generated from metric reports and forwarded to the UI for operator follow-up.
+- **LLM Performance & Metrics** tracks planner/summarizer behavior for observability.
 
-### Tool Calls
-- **Metrics Tooling**: queries Prometheus via PromQL for host/container signals.
-- **Task Runner**: optional execution of experiments or remediation commands.
+### 5. Scheduling Backend
+- **Scheduling API (`edgepilot.schedulers`)** handles task submissions destined for optimized execution.
+- **Policy & Run History** captures prior job executions, chosen policies, and downstream outcomes for reuse.
 
-### Systems / External Calls
-- **Prometheus & exporters** supply the deterministic metrics (node-exporter, cAdvisor, etc.).
-- **Shell Commands / Scripts** allow controlled remediation or load tests when requested.
+### 6. Systems / Exporters
+- **Prometheus, node_exporter, and cAdvisor** supply live system metrics that drive both reporting and scheduling analysis.
 
-### Summarizer (Claude)
-- Crafts the final narrative answer by combining the original question, planner output, and factual data.
-- Adds recommended actions and confidence scores when available.
+### 7. Scheduler Optimizer (Claude)
+- Consumes current metrics plus historical policy data from the backend to synthesize an optimized scheduling strategy.
+- Returns policy updates to the EdgePilot API so upcoming tasks run with the recommended configuration.
+
+### 8. Summarizer (Claude)
+- Consumes the original question, planner plan, and backend facts to craft the final narrative response.
+- Adds recommended actions, confidence notes, and response metrics that contribute to usage alerts.
 
 ## Data Flow Summary
-1. User installs EdgePilot, selects LLM (Claude Haiku), and launches the Streamlit UI.
-2. A question is sent to the planner LLM; JSON action is returned.
-3. EdgePilot API executes the action: queries Prometheus, schedules tasks, or runs shell workflows.
-4. Raw facts and task results are streamed back to the UI and summarized by Claude.
-5. The UI logs metrics and usage alerts, closing the loop for future sessions.
+1. User installs EdgePilot, selects the Claude model, and launches the Streamlit UI/CLI.
+2. A prompt is sent to the planner LLM; validated plan JSON returns to the UI and is forwarded to the API.
+3. The FastAPI backend executes each step by issuing PromQL queries against Prometheus and streams execution signals to the scheduling API.
+4. The scheduling backend gathers policy/run history, augments it with fresh metrics, and hands the package to the optimizer LLM.
+5. The scheduler optimizer returns policy recommendations that the scheduling API applies to upcoming task requests.
+6. EdgePilot runs requested jobs using the optimized policy while logging run context, usage metrics, and alert signals.
+7. Planner and summarizer responses populate LLM performance metrics while the summarizer crafts the narrative answer and closes the loop with usage alerts.
 
 ## Environment & Configuration
 - Credentials are managed via `.env` (`ANTHROPIC_API_KEY`, `CLAUDE_MODEL=claude-3-5-haiku-20241022`, `EDGE_BASE_URL`).
