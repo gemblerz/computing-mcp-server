@@ -5,16 +5,17 @@
       "workload": "web-frontend",
       "policy_id": "cfs_latency",
       "status": "succeeded",
-      "submitted_at": "2025-10-16T05:26:09.456329",
-      "started_at": "2025-10-16T05:26:54.171614",
-      "finished_at": "2025-10-16T05:26:54.328089",
+      "submitted_at": "2025-10-16T16:58:58.318632",
+      "started_at": "2025-10-16T16:59:00.366017",
+      "finished_at": "2025-10-16T16:59:00.825000",
       "metrics": {
-        "duration_s": 0.066,
+        "duration_s": 0.219,
         "exit_code": 0.0,
-        "p99_latency_ms": 66.0
+        "stdout_bytes": 23.0,
+        "stderr_bytes": 0.0
       },
       "tags": [],
-      "notes": "stdout: Hello EdgePilot"
+      "notes": "artifacts dir: /home/monish/computing-mcp-server/edgepilot/job_artifacts/run-job-001-6mxf96z7\nstdout: Fib done: 55 in 0.000s"
     },
     {
       "job_id": "job-002",
