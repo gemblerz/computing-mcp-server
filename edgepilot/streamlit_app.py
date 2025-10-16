@@ -36,8 +36,22 @@ POLICY_WRAPPERS = {
 }
 
 
-def _parse_metrics_from_stdout(stdout: str) -> Tuple[Dict[str, Any], Optional[str]]:
-  metrics: Dict[str, Any] = {}
+def _coerce_numeric_metrics(data: Dict[str, Any]) -> Tuple[Dict[str, float], Optional[str]]:
+  converted: Dict[str, float] = {}
+  warning: Optional[str] = None
+  for key, value in data.items():
+    if isinstance(value, (int, float)):
+      converted[key] = float(value)
+    else:
+      try:
+        converted[key] = float(value)
+      except (TypeError, ValueError):
+        warning = f"Ignored non-numeric metric '{key}'"
+  return converted, warning
+
+
+def _parse_metrics_from_stdout(stdout: str) -> Tuple[Dict[str, float], Optional[str]]:
+  metrics: Dict[str, float] = {}
   note: Optional[str] = None
   if not stdout:
     return metrics, None
@@ -48,7 +62,10 @@ def _parse_metrics_from_stdout(stdout: str) -> Tuple[Dict[str, Any], Optional[st
       try:
         data = json.loads(payload)
         if isinstance(data, dict):
-          metrics.update(data)
+          converted, warning = _coerce_numeric_metrics(data)
+          metrics.update(converted)
+          if warning:
+            note = warning
       except json.JSONDecodeError as exc:
         note = f"Failed to parse METRICS_JSON line: {exc}"
       break
@@ -86,13 +103,11 @@ def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optio
     duration = time.perf_counter() - start
     return False, {"duration_s": round(duration, 3)}, f"Execution error: {exc}"
   duration = time.perf_counter() - start
-  metrics = {
+  metrics: Dict[str, float] = {
     "duration_s": round(duration, 3),
-    "exit_code": result.returncode,
-    "stdout_bytes": len(result.stdout or ""),
-    "stderr_bytes": len(result.stderr or ""),
-    "started_at": start_wall.isoformat(),
-    "finished_at": datetime.now(timezone.utc).isoformat(),
+    "exit_code": float(result.returncode),
+    "stdout_bytes": float(len(result.stdout or "")),
+    "stderr_bytes": float(len(result.stderr or "")),
   }
   notes_parts = [f"artifacts dir: {artifacts_dir}"]
   if result.stdout:
@@ -112,7 +127,10 @@ def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optio
     try:
       file_metrics = json.loads(metrics_path.read_text())
       if isinstance(file_metrics, dict):
-        metrics.update(file_metrics)
+        converted, warning = _coerce_numeric_metrics(file_metrics)
+        metrics.update(converted)
+        if warning:
+          notes_parts.append(warning)
     except json.JSONDecodeError as exc:
       notes_parts.append(f"metrics.json parse error: {exc}")
 
