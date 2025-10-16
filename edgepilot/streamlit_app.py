@@ -104,11 +104,11 @@ with scheduler_tab:
     new_job_id = st.text_input("Job ID", value="job-001")
     new_workload = st.text_input("Workload", value="web-frontend")
     job_kind = st.selectbox("Job Type", ["shell", "python-script"])
-    command_input = ""
     script_upload = None
     if job_kind == "shell":
       command_input = st.text_input("Shell command", value="echo 'Hello EdgePilot'")
     else:
+      command_input = ""
       script_upload = st.file_uploader("Python script (.py)", type=["py"])
     submitted = st.form_submit_button("Add to pending queue")
     if submitted:
