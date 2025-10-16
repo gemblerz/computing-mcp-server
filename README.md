@@ -44,6 +44,14 @@
 - For a longer fake workload, `python -m edgepilot.demo_scheduler` simulates batches, switching policies and streaming metrics automatically.
 - Built-in Linux tuning wrappers live in `edgepilot/policies/` (CFS latency tweaks, nice priority boost, CPU quota via cgroup). Ensure they are executable (`chmod +x edgepilot/policies/apply_*.sh`) and install prerequisites such as `sudo`, `cgexec` (package `cgroup-tools`), and passwordless sysctl access if needed.
 
+### Job Metrics Convention
+- When a job starts, the launcher sets two environment variables:
+  - `EDGE_JOB_METRICS_PATH` – absolute path where the job can write a JSON file containing KPIs (e.g. `{ "records_processed": 1234, "p99_ms": 42 }`).
+  - `EDGE_JOB_ARTIFACTS` – scratch directory created for the run; anything written here is kept for inspection.
+- Jobs can also emit a line to stdout formatted as `METRICS_JSON: {...}`; the launcher merges that JSON object into the recorded metrics.
+- Regardless of custom KPIs, the launcher always captures `duration_s`, `exit_code`, `stdout_bytes`, `stderr_bytes`, `started_at`, and `finished_at`.
+- These metrics are posted to `/jobs/run` and `/policies/{id}/runs`, so policy history now reflects more than just success/failure.
+
 ### Mock Scheduler Service
 - `edgepilot/mock_scheduler.py` spins up a FastAPI service that accepts job submissions, calls `/scheduler/assign`, and updates job lifecycle state.
 - Start EdgePilot (`uvicorn edgepilot.app:app --reload --port 5057`), then run `uvicorn edgepilot.mock_scheduler:app --reload --port 5060`.

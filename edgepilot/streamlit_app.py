@@ -7,8 +7,9 @@ import os
 import shlex
 import subprocess
 import sys
+import tempfile
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Tuple, Optional
 
@@ -25,11 +26,33 @@ from edgepilot.scheduler_service import SchedulerClient
 UPLOAD_DIR = Path(CURRENT_DIR) / "job_uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+RUN_ARTIFACTS_DIR = Path(CURRENT_DIR) / "job_artifacts"
+RUN_ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
+
 POLICY_WRAPPERS = {
   "cfs_latency": str(Path(CURRENT_DIR) / "policies" / "apply_cfs_latency.sh"),
   "nice_boost": str(Path(CURRENT_DIR) / "policies" / "apply_nice_boost.sh"),
   "cpu_quota": str(Path(CURRENT_DIR) / "policies" / "apply_cpu_quota.sh"),
 }
+
+
+def _parse_metrics_from_stdout(stdout: str) -> Tuple[Dict[str, Any], Optional[str]]:
+  metrics: Dict[str, Any] = {}
+  note: Optional[str] = None
+  if not stdout:
+    return metrics, None
+  for line in reversed(stdout.splitlines()):
+    stripped = line.strip()
+    if stripped.startswith("METRICS_JSON:"):
+      payload = stripped[len("METRICS_JSON:"):].strip()
+      try:
+        data = json.loads(payload)
+        if isinstance(data, dict):
+          metrics.update(data)
+      except json.JSONDecodeError as exc:
+        note = f"Failed to parse METRICS_JSON line: {exc}"
+      break
+  return metrics, note
 
 
 def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optional[str]]:
@@ -45,9 +68,20 @@ def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optio
   wrapper = POLICY_WRAPPERS.get(record.get("policy_id"))
   if wrapper:
     command_args = [wrapper, *command_args]
+  start_wall = datetime.now(timezone.utc)
   start = time.perf_counter()
+  artifacts_dir = Path(tempfile.mkdtemp(prefix=f"run-{record['job_id']}-", dir=RUN_ARTIFACTS_DIR))
+  metrics_path = artifacts_dir / "metrics.json"
+  env = os.environ.copy()
+  env.setdefault("EDGE_JOB_METRICS_PATH", str(metrics_path))
+  env.setdefault("EDGE_JOB_ARTIFACTS", str(artifacts_dir))
   try:
-    result = subprocess.run(command_args, capture_output=True, text=True)
+    result = subprocess.run(
+      command_args,
+      capture_output=True,
+      text=True,
+      env=env,
+    )
   except Exception as exc:
     duration = time.perf_counter() - start
     return False, {"duration_s": round(duration, 3)}, f"Execution error: {exc}"
@@ -55,14 +89,33 @@ def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optio
   metrics = {
     "duration_s": round(duration, 3),
     "exit_code": result.returncode,
+    "stdout_bytes": len(result.stdout or ""),
+    "stderr_bytes": len(result.stderr or ""),
+    "started_at": start_wall.isoformat(),
+    "finished_at": datetime.now(timezone.utc).isoformat(),
   }
-  notes_parts = []
+  notes_parts = [f"artifacts dir: {artifacts_dir}"]
   if result.stdout:
     notes_parts.append(f"stdout: {result.stdout.strip()[:200]}")
   if result.stderr:
     notes_parts.append(f"stderr: {result.stderr.strip()[:200]}")
   if record.get("job_kind") == "shell" and result.returncode == 0:
     metrics.setdefault("p99_latency_ms", max(1.0, metrics["duration_s"] * 1000))
+
+  stdout_metrics, stdout_note = _parse_metrics_from_stdout(result.stdout or "")
+  if stdout_metrics:
+    metrics.update(stdout_metrics)
+  if stdout_note:
+    notes_parts.append(stdout_note)
+
+  if metrics_path.exists():
+    try:
+      file_metrics = json.loads(metrics_path.read_text())
+      if isinstance(file_metrics, dict):
+        metrics.update(file_metrics)
+    except json.JSONDecodeError as exc:
+      notes_parts.append(f"metrics.json parse error: {exc}")
+
   success = result.returncode == 0
   notes = "\n".join(notes_parts) if notes_parts else None
   return success, metrics, notes
