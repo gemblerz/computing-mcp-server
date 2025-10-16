@@ -1,0 +1,162 @@
+{
+  "jobs": [
+    {
+      "job_id": "job-001",
+      "workload": "web-frontend",
+      "policy_id": "scx_rusty",
+      "status": "succeeded",
+      "submitted_at": "2025-10-14T04:45:54",
+      "started_at": "2025-10-14T04:45:54",
+      "finished_at": "2025-10-14T04:48:00",
+      "metrics": {
+        "p99_latency_ms": 41.0,
+        "throughput_rps": 1180.0
+      },
+      "tags": [
+        "canary"
+      ],
+      "notes": null
+    },
+    {
+      "job_id": "job-002",
+      "workload": "batch-report",
+      "policy_id": null,
+      "status": "failed",
+      "submitted_at": "2025-10-14T04:45:54",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "build-001",
+      "workload": "web-frontend",
+      "policy_id": "policy-3ccea31e",
+      "status": "scheduled",
+      "submitted_at": "2025-10-16T00:12:05.874630",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "batch-101",
+      "workload": "batch-mixed",
+      "policy_id": "policy-3ccea31e",
+      "status": "scheduled",
+      "submitted_at": "2025-10-16T00:12:05.874630",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "build-101",
+      "workload": "web-frontend",
+      "policy_id": null,
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:20:03.051355",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:20:02",
+      "metrics": {
+        "throughput_rps": 1185.0,
+        "p99_latency_ms": 42.0
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-0-1",
+      "workload": "web-frontend",
+      "policy_id": "scx_rusty",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:43:29.053087",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:43:29.053069",
+      "metrics": {
+        "p99_latency_ms": 49.15,
+        "throughput_rps": 850.2
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-0-2",
+      "workload": "batch-mixed",
+      "policy_id": "scx_rusty",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:43:30.069108",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:43:30.069099",
+      "metrics": {
+        "p99_latency_ms": 37.06,
+        "throughput_rps": 1206.6
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-1-1",
+      "workload": "batch-mixed",
+      "policy_id": "scx_layered",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:43:33.194842",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:43:33.194828",
+      "metrics": {
+        "p99_latency_ms": 57.14,
+        "throughput_rps": 1069.2
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-1-2",
+      "workload": "shared-cluster",
+      "policy_id": "scx_layered",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:43:34.219432",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:43:34.219398",
+      "metrics": {
+        "p99_latency_ms": 57.03,
+        "throughput_rps": 945.6
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-2-1",
+      "workload": "shared-cluster",
+      "policy_id": "scx_rusty",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:43:37.356755",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:43:37.356746",
+      "metrics": {
+        "p99_latency_ms": 57.24,
+        "throughput_rps": 936.4
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-2-2",
+      "workload": "web-frontend",
+      "policy_id": "scx_rusty",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T00:43:38.378104",
+      "started_at": null,
+      "finished_at": "2025-10-16T00:43:38.378083",
+      "metrics": {
+        "p99_latency_ms": 48.92,
+        "throughput_rps": 1166.3
+      },
+      "tags": [],
+      "notes": null
+    }
+  ]
+}

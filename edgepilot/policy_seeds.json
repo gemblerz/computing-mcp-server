@@ -1,0 +1,40 @@
+{
+  "policies": [
+    {
+      "id": "cfs_latency",
+      "name": "cfs_latency",
+      "description": "Reduce CFS latency to favor short interactive workloads.",
+      "intent": "Improve responsiveness for bursty foreground tasks.",
+      "target_workloads": ["web-frontend", "interactive"],
+      "guardrails": ["exit_code = 0"],
+      "kpis": {},
+      "notes": [
+        "Applies kernel.sched_min_granularity_ns tweaks via edgepilot/policies/apply_cfs_latency.sh"
+      ]
+    },
+    {
+      "id": "nice_boost",
+      "name": "nice_boost",
+      "description": "Run jobs with elevated CPU priority using nice -5.",
+      "intent": "Lower latency for mission-critical tasks without kernel modules.",
+      "target_workloads": ["web-frontend", "api-gateway"],
+      "guardrails": ["exit_code = 0"],
+      "kpis": {},
+      "notes": [
+        "Wrapper: edgepilot/policies/apply_nice_boost.sh <command ...>"
+      ]
+    },
+    {
+      "id": "cpu_quota",
+      "name": "cpu_quota",
+      "description": "Throttle jobs with a 200% CPU quota using cgroup v2.",
+      "intent": "Prevent batch workloads from starving latency-sensitive jobs.",
+      "target_workloads": ["batch-mixed", "ci-cd"],
+      "guardrails": ["exit_code = 0"],
+      "kpis": {},
+      "notes": [
+        "Wrapper: edgepilot/policies/apply_cpu_quota.sh <command ...>"
+      ]
+    }
+  ]
+}

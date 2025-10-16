@@ -26,6 +26,31 @@
 ### 5. Scheduling Backend
 - **Scheduling API (`edgepilot.schedulers`)** handles task submissions destined for optimized execution.
 - **Policy & Run History** captures prior job executions, chosen policies, and downstream outcomes for reuse.
+- **Workload Profiles (`/workloads/profile`)** expose time-bucketed resource summaries and contention hints to the optimizer loop.
+- **Policy Metadata API (`/policies/...`)** centralizes scheduler intents, guardrails, KPI history, and verification tokens for safe reuse.
+- **Job Run API (`/jobs/...`)** records per-task lifecycle events so workload profiles include recent history, status counts, and policy usage.
+- **Scheduler Assignment (`/scheduler/assign`)** chooses a policy for incoming jobs, logs assignments, and returns rationale plus alternatives.
+
+### CLI Workflow (edgepilot/cli.py)
+- Select a policy for new jobs: `python -m edgepilot.cli assign --jobs '[{"job_id":"build-101","workload":"web-frontend"}]'`
+- Update job lifecycle events: `python -m edgepilot.cli job-update --job-id build-101 --workload web-frontend --status running --started-at $(date -u +"%Y-%m-%dT%H:%M:%SZ")`
+- Post batch KPIs to the policy store: `python -m edgepilot.cli policy-run --policy-id scx_rusty --kpis '{"p99_latency_ms":40,"throughput_rps":1250}'`
+
+### Python Integration (edgepilot/scheduler_service.py)
+- `SchedulerClient.assign_jobs()` wraps `/scheduler/assign` so controller code can fetch a policy recommendation in one call.
+- `SchedulerClient.update_job()` posts lifecycle events to `/jobs/run` whenever the scheduler starts, finishes, or retries work.
+- `SchedulerClient.record_policy_run()` pushes aggregated KPIs back into `/policies/{id}/runs` once batch metrics are available.
+- Run `python -m edgepilot.scheduler_service` for a small end-to-end smoke flow that exercises these helper methods.
+- For a longer fake workload, `python -m edgepilot.demo_scheduler` simulates batches, switching policies and streaming metrics automatically.
+- Built-in Linux tuning wrappers live in `edgepilot/policies/` (CFS latency tweaks, nice priority boost, CPU quota via cgroup). Ensure they are executable (`chmod +x edgepilot/policies/apply_*.sh`) and install prerequisites such as `sudo`, `cgexec` (package `cgroup-tools`), and passwordless sysctl access if needed.
+
+### Mock Scheduler Service
+- `edgepilot/mock_scheduler.py` spins up a FastAPI service that accepts job submissions, calls `/scheduler/assign`, and updates job lifecycle state.
+- Start EdgePilot (`uvicorn edgepilot.app:app --reload --port 5057`), then run `uvicorn edgepilot.mock_scheduler:app --reload --port 5060`.
+- Submit work: `curl -X POST http://127.0.0.1:5060/jobs/submit -H 'content-type: application/json' -d '{"jobs":[{"job_id":"job-1","workload":"web-frontend"}]}'`
+- Advance jobs: `curl -X POST http://127.0.0.1:5060/jobs/job-1/start` then `curl -X POST http://127.0.0.1:5060/jobs/job-1/finish -H 'content-type: application/json' -d '{"metrics":{"p99_latency_ms":38}}'`
+- The mock service automatically posts to `/jobs/run` and `/policies/{id}/runs`, so the policy catalog learns without manual CLI steps.
+- The Streamlit scheduler tab lets you queue shell commands or uploaded Python scripts, execute them locally, and stream duration/exit-code metrics back into EdgePilot.
 
 ### 6. Systems / Exporters
 - **Prometheus, node_exporter, and cAdvisor** supply live system metrics that drive both reporting and scheduling analysis.
