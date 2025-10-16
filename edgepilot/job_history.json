@@ -3,31 +3,33 @@
     {
       "job_id": "job-001",
       "workload": "web-frontend",
-      "policy_id": "scx_rusty",
+      "policy_id": "cfs_latency",
       "status": "succeeded",
-      "submitted_at": "2025-10-14T04:45:54",
-      "started_at": "2025-10-14T04:45:54",
-      "finished_at": "2025-10-14T04:48:00",
+      "submitted_at": "2025-10-16T05:26:09.456329",
+      "started_at": "2025-10-16T05:26:54.171614",
+      "finished_at": "2025-10-16T05:26:54.328089",
       "metrics": {
-        "p99_latency_ms": 41.0,
-        "throughput_rps": 1180.0
+        "duration_s": 0.066,
+        "exit_code": 0.0,
+        "p99_latency_ms": 66.0
       },
-      "tags": [
-        "canary"
-      ],
-      "notes": null
+      "tags": [],
+      "notes": "stdout: Hello EdgePilot"
     },
     {
       "job_id": "job-002",
-      "workload": "batch-report",
-      "policy_id": null,
+      "workload": "web-frontend",
+      "policy_id": "cfs_latency",
       "status": "failed",
-      "submitted_at": "2025-10-14T04:45:54",
-      "started_at": null,
-      "finished_at": null,
-      "metrics": {},
+      "submitted_at": "2025-10-16T05:26:51.685506",
+      "started_at": "2025-10-16T05:26:56.886116",
+      "finished_at": "2025-10-16T05:26:57.652858",
+      "metrics": {
+        "duration_s": 0.696,
+        "exit_code": 1.0
+      },
       "tags": [],
-      "notes": null
+      "notes": "stderr: Traceback (most recent call last):\n  File \"/home/monish/computing-mcp-server/edgepilot/job_uploads/job-002-1760592405.py\", line 13, in <module>\n    print(f\"Fib done: {result} in {duration:.3f}s\")\n    "
     },
     {
       "job_id": "build-001",
@@ -155,6 +157,84 @@
         "p99_latency_ms": 48.92,
         "throughput_rps": 1166.3
       },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "cli-1",
+      "workload": "web-frontend",
+      "policy_id": "cfs_latency",
+      "status": "scheduled",
+      "submitted_at": "2025-10-16T03:58:10.494322",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "demo-001",
+      "workload": "web-frontend",
+      "policy_id": "nice_boost",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T03:59:47.138070",
+      "started_at": null,
+      "finished_at": "2025-10-16T03:59:46",
+      "metrics": {
+        "duration_s": 3.2,
+        "exit_code": 0.0
+      },
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "job-003",
+      "workload": "web-frontend",
+      "policy_id": "cfs_latency",
+      "status": "succeeded",
+      "submitted_at": "2025-10-16T05:42:14.783477",
+      "started_at": "2025-10-16T05:42:16.452679",
+      "finished_at": "2025-10-16T05:42:16.747536",
+      "metrics": {
+        "duration_s": 0.223,
+        "exit_code": 0.0
+      },
+      "tags": [],
+      "notes": "stdout: Fib done: 55 in 0.000s"
+    },
+    {
+      "job_id": "job-004",
+      "workload": "batch-mixed",
+      "policy_id": "cfs_latency",
+      "status": "scheduled",
+      "submitted_at": "2025-10-16T04:35:15.736406",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "job-005",
+      "workload": "batch-mixed",
+      "policy_id": "cfs_latency",
+      "status": "scheduled",
+      "submitted_at": "2025-10-16T04:35:15.736406",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
+      "tags": [],
+      "notes": null
+    },
+    {
+      "job_id": "job-006",
+      "workload": "batch-mixed",
+      "policy_id": "cfs_latency",
+      "status": "scheduled",
+      "submitted_at": "2025-10-16T04:35:15.736406",
+      "started_at": null,
+      "finished_at": null,
+      "metrics": {},
       "tags": [],
       "notes": null
     }

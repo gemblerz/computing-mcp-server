@@ -5,26 +5,182 @@
       "name": "cfs_latency",
       "description": "Reduce CFS latency to favor short interactive workloads.",
       "intent": "Improve responsiveness for bursty foreground tasks.",
-      "target_workloads": ["web-frontend", "interactive"],
-      "guardrails": ["exit_code = 0"],
+      "target_workloads": [
+        "web-frontend",
+        "interactive"
+      ],
+      "guardrails": [
+        "exit_code = 0"
+      ],
       "embedding": [],
-      "kpis": {},
+      "kpis": {
+        "duration_s": 0.223,
+        "exit_code": 0.0,
+        "p99_latency_ms": 66.0
+      },
       "notes": [
         "Applies kernel.sched_min_granularity_ns tweaks via edgepilot/policies/apply_cfs_latency.sh"
       ],
       "created_at": "2025-10-16T00:00:00",
-      "updated_at": "2025-10-16T00:00:00",
+      "updated_at": "2025-10-16T05:42:17.191775",
       "last_verified_at": null,
       "last_activation_token": null,
-      "history": []
+      "history": [
+        {
+          "timestamp": "2025-10-16T04:35:22.456694",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.078,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory"
+        },
+        {
+          "timestamp": "2025-10-16T04:44:32.366279",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.036,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory"
+        },
+        {
+          "timestamp": "2025-10-16T05:03:43.940006",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.031,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory"
+        },
+        {
+          "timestamp": "2025-10-16T05:04:29.665900",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.04,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory"
+        },
+        {
+          "timestamp": "2025-10-16T05:12:38.754324",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.077,
+            "exit_code": 0.0,
+            "p99_latency_ms": 77.0
+          },
+          "notes": "stdout: Hello EdgePilot\nstderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory\nsysctl: cannot stat /proc/sys/kernel/sched_wakeup_granularity_ns: No such file or directory"
+        },
+        {
+          "timestamp": "2025-10-16T05:14:21.792213",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.203,
+            "exit_code": 0.0,
+            "p99_latency_ms": 203.0
+          },
+          "notes": "stdout: Hello EdgePilot\nstderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory\nsysctl: cannot stat /proc/sys/kernel/sched_wakeup_granularity_ns: No such file or directory"
+        },
+        {
+          "timestamp": "2025-10-16T05:14:27.508275",
+          "workload_label": "batch-mixed",
+          "kpis": {
+            "duration_s": 2.74,
+            "exit_code": 0.0,
+            "p99_latency_ms": 2740.0
+          },
+          "notes": "stderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory\nsysctl: cannot stat /proc/sys/kernel/sched_wakeup_granularity_ns: No such file or directory\n128+0 records in\n12"
+        },
+        {
+          "timestamp": "2025-10-16T05:14:31.034372",
+          "workload_label": "batch-mixed",
+          "kpis": {
+            "duration_s": 0.717,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: sysctl: cannot stat /proc/sys/kernel/sched_min_granularity_ns: No such file or directory\nsysctl: cannot stat /proc/sys/kernel/sched_wakeup_granularity_ns: No such file or directory\nTraceback (most rec"
+        },
+        {
+          "timestamp": "2025-10-16T05:20:57.822649",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.063,
+            "exit_code": 0.0,
+            "p99_latency_ms": 63.0
+          },
+          "notes": "stdout: Hello EdgePilot"
+        },
+        {
+          "timestamp": "2025-10-16T05:21:00.630511",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.698,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: Traceback (most recent call last):\n  File \"/home/monish/computing-mcp-server/edgepilot/job_uploads/job-002-1760592049.py\", line 13, in <module>\n    print(f\"Fib done: {result} in {duration:.3f}s\")\n    "
+        },
+        {
+          "timestamp": "2025-10-16T05:22:59.655836",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.638,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: Traceback (most recent call last):\n  File \"/home/monish/computing-mcp-server/edgepilot/job_uploads/job-001-1760592167.py\", line 13, in <module>\n    print(f\"Fib done: {result} in {duration:.3f}s\")\n    "
+        },
+        {
+          "timestamp": "2025-10-16T05:23:18.686360",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.089,
+            "exit_code": 0.0,
+            "p99_latency_ms": 89.0
+          },
+          "notes": "stdout: Hello EdgePilot"
+        },
+        {
+          "timestamp": "2025-10-16T05:26:54.696618",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.066,
+            "exit_code": 0.0,
+            "p99_latency_ms": 66.0
+          },
+          "notes": "stdout: Hello EdgePilot"
+        },
+        {
+          "timestamp": "2025-10-16T05:26:57.958636",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.696,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: Traceback (most recent call last):\n  File \"/home/monish/computing-mcp-server/edgepilot/job_uploads/job-002-1760592405.py\", line 13, in <module>\n    print(f\"Fib done: {result} in {duration:.3f}s\")\n    "
+        },
+        {
+          "timestamp": "2025-10-16T05:42:17.191727",
+          "workload_label": "web-frontend",
+          "kpis": {
+            "duration_s": 0.223,
+            "exit_code": 0.0
+          },
+          "notes": "stdout: Fib done: 55 in 0.000s"
+        }
+      ]
     },
     {
       "id": "nice_boost",
       "name": "nice_boost",
       "description": "Run jobs with elevated CPU priority using nice -5.",
       "intent": "Lower latency for mission-critical tasks without kernel modules.",
-      "target_workloads": ["web-frontend", "api-gateway"],
-      "guardrails": ["exit_code = 0"],
+      "target_workloads": [
+        "web-frontend",
+        "api-gateway"
+      ],
+      "guardrails": [
+        "exit_code = 0"
+      ],
       "embedding": [],
       "kpis": {},
       "notes": [
@@ -41,18 +197,45 @@
       "name": "cpu_quota",
       "description": "Throttle jobs with a 200% CPU quota using cgroup v2.",
       "intent": "Prevent batch workloads from starving latency-sensitive jobs.",
-      "target_workloads": ["batch-mixed", "ci-cd"],
-      "guardrails": ["exit_code = 0"],
+      "target_workloads": [
+        "batch-mixed",
+        "ci-cd"
+      ],
+      "guardrails": [
+        "exit_code = 0"
+      ],
       "embedding": [],
-      "kpis": {},
+      "kpis": {
+        "duration_s": 0.007,
+        "exit_code": 1.0
+      },
       "notes": [
         "Wrapper: edgepilot/policies/apply_cpu_quota.sh <command ...>"
       ],
       "created_at": "2025-10-16T00:00:00",
-      "updated_at": "2025-10-16T00:00:00",
+      "updated_at": "2025-10-16T04:46:58.022022",
       "last_verified_at": null,
       "last_activation_token": null,
-      "history": []
+      "history": [
+        {
+          "timestamp": "2025-10-16T04:46:55.859526",
+          "workload_label": "batch-mixed",
+          "kpis": {
+            "duration_s": 0.009,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: apply_cpu_quota: cgexec not found; install libcgroup tools."
+        },
+        {
+          "timestamp": "2025-10-16T04:46:58.021999",
+          "workload_label": "batch-mixed",
+          "kpis": {
+            "duration_s": 0.007,
+            "exit_code": 1.0
+          },
+          "notes": "stderr: apply_cpu_quota: cgexec not found; install libcgroup tools."
+        }
+      ]
     }
   ]
 }

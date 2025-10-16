@@ -31,6 +31,42 @@ POLICY_WRAPPERS = {
   "cpu_quota": str(Path(CURRENT_DIR) / "policies" / "apply_cpu_quota.sh"),
 }
 
+
+def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optional[str]]:
+  """Execute the stored command for a job and return (success, metrics, notes)."""
+  command = record.get("command")
+  command_args = record.get("command_args")
+  if not command and not command_args:
+    return False, {}, "No command configured."
+
+  if not command_args:
+    command_args = shlex.split(command)
+
+  wrapper = POLICY_WRAPPERS.get(record.get("policy_id"))
+  if wrapper:
+    command_args = [wrapper, *command_args]
+  start = time.perf_counter()
+  try:
+    result = subprocess.run(command_args, capture_output=True, text=True)
+  except Exception as exc:
+    duration = time.perf_counter() - start
+    return False, {"duration_s": round(duration, 3)}, f"Execution error: {exc}"
+  duration = time.perf_counter() - start
+  metrics = {
+    "duration_s": round(duration, 3),
+    "exit_code": result.returncode,
+  }
+  notes_parts = []
+  if result.stdout:
+    notes_parts.append(f"stdout: {result.stdout.strip()[:200]}")
+  if result.stderr:
+    notes_parts.append(f"stderr: {result.stderr.strip()[:200]}")
+  if record.get("job_kind") == "shell" and result.returncode == 0:
+    metrics.setdefault("p99_latency_ms", max(1.0, metrics["duration_s"] * 1000))
+  success = result.returncode == 0
+  notes = "\n".join(notes_parts) if notes_parts else None
+  return success, metrics, notes
+
 st.set_page_config(page_title="EdgePilot Assistant", page_icon="🛰️", layout="wide")
 st.title("🛰️ EdgePilot Control Center")
 
@@ -254,7 +290,7 @@ with scheduler_tab:
               workload_label=record["workload"],
               notes=notes,
             )
-          st.experimental_rerun()
+          st.rerun()
       elif record["status"] == "running":
         with cols[5].form(f"finish-{record['job_id']}"):
           metrics_input = st.text_input("Metrics JSON", value='{"p99_latency_ms":40}')
@@ -285,46 +321,9 @@ with scheduler_tab:
                 kpis=metrics,
                 workload_label=record["workload"],
               )
-            st.experimental_rerun()
+            st.rerun()
       else:
         cols[5].markdown("—")
     st.markdown("\n")
   else:
     st.info("No jobs have been assigned yet.")
-
-
-def run_local_job(record: Dict[str, Any]) -> Tuple[bool, Dict[str, float], Optional[str]]:
-  """Execute the stored command for a job and return (success, metrics, notes)."""
-  command = record.get("command")
-  command_args = record.get("command_args")
-  if not command and not command_args:
-    return False, {}, "No command configured."
-
-  if not command_args:
-    command_args = shlex.split(command)
-
-  wrapper = POLICY_WRAPPERS.get(record.get("policy_id"))
-  if wrapper:
-    command_args = [wrapper, *command_args]
-  start = time.perf_counter()
-  try:
-    result = subprocess.run(command_args, capture_output=True, text=True)
-  except Exception as exc:
-    duration = time.perf_counter() - start
-    return False, {"duration_s": round(duration, 3)}, f"Execution error: {exc}"
-  duration = time.perf_counter() - start
-  metrics = {
-    "duration_s": round(duration, 3),
-    "exit_code": result.returncode,
-  }
-  notes_parts = []
-  if result.stdout:
-    notes_parts.append(f"stdout: {result.stdout.strip()[:200]}")
-  if result.stderr:
-    notes_parts.append(f"stderr: {result.stderr.strip()[:200]}")
-  # propagate default policy metrics for heuristics if exit code success
-  if record.get("job_kind") == "shell" and result.returncode == 0:
-    metrics.setdefault("p99_latency_ms", max(1.0, metrics["duration_s"] * 1000))
-  success = result.returncode == 0
-  notes = "\n".join(notes_parts) if notes_parts else None
-  return success, metrics, notes
