@@ -64,11 +64,11 @@ def _process_snapshot(limit: int = 10, all_processes: bool = False) -> List[Dict
 
     if all_processes:
         # Return all processes sorted by CPU usage
-        procs.sort(key=lambda item: item["cpu_percent"], reverse=True)
+        procs.sort(key=lambda item: item.get("cpu_percent") or 0.0, reverse=True)
         return procs
     else:
         # Return top N by CPU usage
-        procs.sort(key=lambda item: item["cpu_percent"], reverse=True)
+        procs.sort(key=lambda item: item.get("cpu_percent") or 0.0, reverse=True)
         return procs[:limit]
 
 

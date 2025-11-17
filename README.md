@@ -37,12 +37,47 @@ python main.py serve --host 127.0.0.1 --port 8000
 
 ### 3. Test Tools
 ```bash
-# Test all MCP tools integration
-python test_tools.py
-
-# Test launcher directly
-python tools/launcher.py
+# Test MCP tools via pytest
+pytest test/test_tools.py
 ```
+
+## Command-Line Interface (CLI)
+Ask questions, launch jobs, or inspect the scheduler from any terminal:
+
+```bash
+# Start interactive REPL (macOS/Linux/Windows)
+python -m edgepilot_cli start
+
+# One-shot questions
+python -m edgepilot_cli ask "Can I run a heavy build now?"
+python -m edgepilot_cli ask "Show recent jobs" --format json
+
+# Queue new work
+python -m edgepilot_cli schedule --action run_shell --command "echo hello" --delay 5
+python -m edgepilot_cli schedule --action launch --command "Calculator"
+
+# Inspect the scheduler
+python -m edgepilot_cli status --limit 10
+```
+
+`edgepilot_cli activate` is an alias for the REPL, and `--context-file` lets you feed additional JSON context into `ask`.
+
+## Local REST API
+When the backend is running (`python -m main serve --host 127.0.0.1 --port 8000`), you can integrate EdgePilot into scripts:
+
+- `POST /api/ask`
+  ```bash
+  curl -X POST http://127.0.0.1:8000/api/ask \
+       -H "Content-Type: application/json" \
+       -d '{"query":"Is it safe to schedule another GPU job?","response_format":"json"}'
+  ```
+- `POST /api/schedule`
+  ```bash
+  curl -X POST http://127.0.0.1:8000/api/schedule \
+       -H "Content-Type: application/json" \
+       -d '{"action":"run_shell","command":"echo from API","delay_seconds":0}'
+  ```
+- `GET /api/tasks` – list recent scheduled tasks (filterable via `?action=run_shell&limit=3`)
 
 ### 4. Try It Out!
 Open the UI and try these prompts with **Gemini**:
@@ -92,10 +127,14 @@ EdgePilot/
 │   ├── gemini.py            # Gemini with function calling
 │   ├── claude.py            # Claude adapter
 │   └── gpt.py               # GPT placeholder
+├── core/                    # Shared CLI/API helpers and settings
+│   ├── interface.py         # ask/schedule/task-summary helpers
+│   └── settings.py          # Provider configuration + system prompt
+├── edgepilot_cli.py         # Typer-based CLI (ask/schedule/status/start)
 ├── tools/                   # System utilities exposed as tools
-│   ├── __init__.py          # Export gather_metrics, launch, search, list_apps, end_task
+│   ├── __init__.py          # Export scheduler + metrics helpers
 │   ├── metrics.py           # System monitoring (CPU, memory, processes)
-│   ├── launcher.py          # Application launcher with Windows Start Menu search
+│   ├── scheduler.py         # Task registry + launcher + shell/python runner
 │   └── end_task.py          # Process termination
 ├── MCP/                     # Model Context Protocol integration
 │   ├── tool_schemas.py      # Function calling schemas for all 5 tools
@@ -115,6 +154,9 @@ EdgePilot/
 - `GET /api/chats/{chat_id}` – fetch full conversation history
 - `POST /api/chats/{chat_id}/messages` – send a prompt and get LLM response (with tool calling)
 - `GET /api/metrics` – retrieve current system metrics snapshot
+- `POST /api/ask` – submit natural-language questions through the shared assistant logic
+- `POST /api/schedule` – queue shell/python/launch jobs
+- `GET /api/tasks` – inspect scheduled job history
 
 ## MCP (Model Context Protocol)
 

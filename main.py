@@ -10,11 +10,10 @@ import time
 import uuid
 from pathlib import Path
 from shutil import which
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import typer
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
@@ -22,9 +21,22 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from providers import available_providers, get_provider
-from providers.base import ChatMessage, ProviderConfig
+from providers.base import ChatMessage
 from tools.metrics import ensure_data_dir, gather_metrics
-from MCP import execute_tool, format_tools_for_gemini
+from MCP import (
+    execute_tool,
+    format_tools_for_claude,
+    format_tools_for_gemini,
+    get_all_tool_schemas,
+)
+from core.interface import ask_question, schedule_operation, summarize_tasks
+from core.settings import (
+    DEFAULT_PROVIDER,
+    PROVIDER_ENV_SETTINGS,
+    SYSTEM_PROMPT,
+    load_env,
+    provider_config,
+)
 
 ROOT_DIR = Path(__file__).parent
 DATA_DIR = ROOT_DIR / "data"
@@ -32,33 +44,6 @@ CHAT_FILE = DATA_DIR / "chat_history.json"
 USAGE_FILE = DATA_DIR / "usage_metrics.json"
 TOOL_HISTORY_FILE = DATA_DIR / "tool_call_history.json"
 FRONTEND_DIR = ROOT_DIR / "frontend"
-
-SYSTEM_PROMPT = (
-    "You are EdgePilot, an on-prem AI copilot who understands real-time system capacity, bottlenecks, "
-    "and scheduling needs for engineers. Provide succinct, actionable guidance grounded in the latest "
-    "system context."
-)
-
-PROVIDER_ENV_SETTINGS = {
-    "gemini": {
-        "api_key": "GEMINI_API_KEY",
-        "model": "GEMINI_MODEL",
-        "default_model": "gemini-2.0-flash",
-        "base_url": "GEMINI_BASE_URL",
-    },
-    "claude": {
-        "api_key": "ANTHROPIC_API_KEY",
-        "model": "CLAUDE_MODEL",
-        "default_model": "claude-3-5-haiku-20241022",
-        "base_url": "CLAUDE_BASE_URL",
-    },
-    "gpt": {
-        "api_key": "OPENAI_API_KEY",
-        "model": "GPT_MODEL",
-        "default_model": "gpt-4o-mini",
-        "base_url": "GPT_BASE_URL",
-    },
-}
 
 
 cli = typer.Typer(add_completion=False, help="EdgePilot backend CLI.")
@@ -94,6 +79,36 @@ class SendMessageResponse(BaseModel):
     prompt_tokens: int
     response_tokens: int
     chat: ChatDetail
+
+
+class AskRequest(BaseModel):
+    query: str
+    provider: Optional[str] = None
+    response_format: str = Field("text", description="Either 'text' or 'json'.")
+    context: Optional[Dict[str, Any]] = None
+    system_prompt: Optional[str] = None
+    context_window: int = Field(5, ge=1, le=50)
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    provider: str
+    used_remote_provider: bool
+    metrics: Dict[str, Any]
+    recent_tasks: List[Dict[str, Any]]
+    tokens: Dict[str, Any]
+    response_format: str
+
+
+class ScheduleRequest(BaseModel):
+    action: str
+    command: Optional[str] = None
+    application: Optional[str] = None
+    script_path: Optional[str] = None
+    args: Optional[List[str]] = None
+    cwd: Optional[str] = None
+    delay_seconds: int = Field(0, ge=0)
 
 
 class ChatStore:
@@ -291,27 +306,7 @@ class ToolCallLogger:
             self._write(data)
 
 
-def load_env() -> None:
-    env_path = Path("env") / ".env"
-    if env_path.exists():
-        load_dotenv(env_path, override=False)
-
-
-def provider_config(name: str) -> ProviderConfig:
-    key = name.lower()
-    settings = PROVIDER_ENV_SETTINGS.get(key)
-    if not settings:
-        raise ValueError(f"Unsupported provider '{name}'")
-
-    api_key = os.getenv(settings["api_key"], "").strip()
-    model = os.getenv(settings["model"], settings["default_model"]).strip()
-    base_url = os.getenv(settings["base_url"], "").strip() or None
-    timeout = int(os.getenv("LLM_TIMEOUT_SEC", "60"))
-    return ProviderConfig(api_key=api_key, model=model or settings["default_model"], timeout_sec=timeout, base_url=base_url)
-
-
 load_env()
-DEFAULT_PROVIDER = os.getenv("DEFAULT_PROVIDER", "gemini").lower()
 
 chat_store = ChatStore(CHAT_FILE)
 usage_logger = UsageLogger(USAGE_FILE)
@@ -386,6 +381,35 @@ def api_metrics() -> Dict[str, object]:
     return gather_metrics()
 
 
+@app.post("/api/ask", response_model=AskResponse)
+def api_ask(payload: AskRequest) -> AskResponse:
+    fmt = (payload.response_format or "text").lower()
+    if fmt not in {"text", "json"}:
+        raise HTTPException(status_code=400, detail="response_format must be 'text' or 'json'")
+    result = ask_question(
+        payload.query,
+        provider=payload.provider,
+        response_format=fmt,
+        context=payload.context,
+        system_prompt=payload.system_prompt,
+        context_window=payload.context_window,
+    )
+    return AskResponse(**result)
+
+
+@app.post("/api/schedule")
+def api_schedule(payload: ScheduleRequest) -> Dict[str, Any]:
+    try:
+        return schedule_operation(payload.action, payload.model_dump())
+    except ValueError as error:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=str(error)) from error
+
+
+@app.get("/api/tasks")
+def api_tasks(action: Optional[str] = None, limit: int = 5) -> List[Dict[str, Any]]:
+    return summarize_tasks(action, limit)
+
+
 @app.get("/api/chats")
 def api_list_chats() -> List[ChatSummary]:
     sessions = chat_store.list_sessions()
@@ -433,8 +457,19 @@ def api_send_message(chat_id: str, payload: SendMessageRequest) -> SendMessageRe
         raise HTTPException(status_code=404, detail="Chat not found") from None
 
     # Enable tools for providers that support them
-    if hasattr(provider, 'enable_tools'):
-        tool_schemas = format_tools_for_gemini()
+    if hasattr(provider, "enable_tools"):
+        provider_id = ""
+        try:
+            provider_id = (type(provider).describe() or {}).get("id", "")
+        except Exception:
+            provider_id = ""
+
+        if provider_id == "claude":
+            tool_schemas = format_tools_for_claude()
+        elif provider_id == "gemini":
+            tool_schemas = format_tools_for_gemini()
+        else:
+            tool_schemas = get_all_tool_schemas()
         provider.enable_tools(tool_schemas)
 
     user_message: ChatMessage = {
@@ -699,8 +734,7 @@ def test_tools(
     """Test core MCP tool calls and print their outputs (cross-platform)."""
     from MCP import execute_tool
 
-    typer.echo("=== Testing Computing MCP Tool Calls ===
-")
+    typer.echo("=== Testing Computing MCP Tool Calls ===\n")
 
     # Test 1: gather_metrics
     typer.echo("1. Testing gather_metrics tool:")
