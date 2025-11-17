@@ -693,18 +693,21 @@ def tool_metrics(
 
 
 @tools_cli.command("test-tools")
-def test_tools() -> None:
-    """Test all tool calls and print their outputs."""
+def test_tools(
+    actually_launch: bool = typer.Option(False, "--launch", help="If set, attempt a real launch of a found app.")
+) -> None:
+    """Test core MCP tool calls and print their outputs (cross-platform)."""
     from MCP import execute_tool
 
-    typer.echo("=== Testing EdgePilot Tool Calls ===\n")
+    typer.echo("=== Testing Computing MCP Tool Calls ===
+")
 
     # Test 1: gather_metrics
     typer.echo("1. Testing gather_metrics tool:")
     result = execute_tool("gather_metrics", {"top_n": 5})
     typer.echo(f"   Success: {result.get('success')}")
-    if result.get('success'):
-        metrics = result.get('result', {})
+    if result.get("success"):
+        metrics = result.get("result", {})
         typer.echo(f"   CPU: {metrics.get('cpu', {}).get('percent')}%")
         typer.echo(f"   Memory Used: {metrics.get('memory', {}).get('percent')}%")
         typer.echo(f"   Top Processes: {len(metrics.get('top_processes', []))}")
@@ -712,49 +715,81 @@ def test_tools() -> None:
         typer.echo(f"   Error: {result.get('error')}")
     typer.echo()
 
-    # Test 2: search_path
-    typer.echo("2. Testing search_path tool (searching for 'notepad'):")
-    result = execute_tool("search_path", {"query": "notepad", "max_results": 3})
+    # Test 2: search (platform-friendly query)
+    query = "term"
+    typer.echo(f"2. Testing search tool (searching for '{query}'):")
+    result = execute_tool("search", {"app_name": query})
     typer.echo(f"   Success: {result.get('success')}")
-    if result.get('success'):
-        search_result = result.get('result', {})
-        typer.echo(f"   Found: {search_result.get('found')} paths")
-        for i, path in enumerate(search_result.get('paths', []), 1):
-            typer.echo(f"   {i}. {path}")
+    if result.get("success"):
+        payload = result.get("result") or {}
+        matches = payload.get("matches") or payload.get("apps") or payload
+        if isinstance(matches, list):
+            typer.echo(f"   Found {len(matches)} matches")
+            for i, name in enumerate(matches[:5], 1):
+                typer.echo(f"   {i}. {name}")
+        else:
+            typer.echo("   (No list returned)")
     else:
         typer.echo(f"   Error: {result.get('error')}")
     typer.echo()
 
-    # Test 3: schedule_task (with path from search)
-    typer.echo("3. Testing schedule_task tool (notepad):")
-    # First get a path
-    search_result = execute_tool("search_path", {"query": "notepad.exe", "max_results": 1})
-    if search_result.get('success') and search_result['result']['found'] > 0:
-        notepad_path = search_result['result']['paths'][0]
-        result = execute_tool("schedule_task", {
-            "application": notepad_path,
-            "delay_seconds": 0
-        })
-        typer.echo(f"   Success: {result.get('success')}")
-        if result.get('success'):
-            task_result = result.get('result', {})
-            typer.echo(f"   Status: {task_result.get('status')}")
-            typer.echo(f"   PID: {task_result.get('pid')}")
-            typer.echo(f"   Path: {notepad_path}")
+    # Test 3: list_apps
+    typer.echo("3. Testing list_apps tool (filter 'term'):")
+    result = execute_tool("list_apps", {"filter_term": "term"})
+    typer.echo(f"   Success: {result.get('success')}")
+    if result.get("success"):
+        payload = result.get("result") or {}
+        apps = payload.get("apps") or payload.get("matches") or payload
+        if isinstance(apps, list):
+            typer.echo(f"   Returned {len(apps)} app(s). Sample:")
+            for i, name in enumerate(apps[:5], 1):
+                typer.echo(f"   {i}. {name}")
         else:
-            typer.echo(f"   Error: {result.get('error')}")
+            typer.echo("   (No list returned)")
     else:
-        typer.echo("   Skipped - could not find notepad.exe")
+        typer.echo(f"   Error: {result.get('error')}")
     typer.echo()
 
-    # Test 4: end_task (test with a safe process name that likely doesn't exist)
-    typer.echo("4. Testing end_task tool (safe test - non-existent process):")
-    result = execute_tool("end_task", {
-        "identifier": "fake_process_that_doesnt_exist_12345",
-        "force": False
-    })
+    # Test 4: optional launch
+    candidates_by_platform = {
+        "win": ["notepad", "wordpad", "paint", "windows terminal", "calc"],
+        "darwin": ["Safari", "TextEdit", "Notes", "Terminal", "Calculator"],
+        "linux": ["Calculator", "Firefox", "Files", "Terminal", "Chromium"],
+    }
+    plat = "win" if os.name == "nt" else "darwin" if sys.platform == "darwin" else "linux"
+    candidates = candidates_by_platform.get(plat, [])
+    chosen: Optional[str] = None
+    for candidate in candidates:
+        res = execute_tool("search", {"app_name": candidate})
+        if res.get("success"):
+            payload = res.get("result") or {}
+            matches = payload.get("apps") or payload.get("matches") or payload
+            if isinstance(matches, list) and matches:
+                chosen = matches[0]
+                break
+    typer.echo("4. Testing launch tool:")
+    if chosen and actually_launch:
+        typer.echo(f"   Attempting to launch '{chosen}'...")
+        res = execute_tool("launch", {"app_name": chosen, "delay_seconds": 0})
+        typer.echo(f"   Success: {res.get('success')}")
+        if not res.get("success"):
+            typer.echo(f"   Error: {res.get('error')}")
+    else:
+        note = "(set --launch to actually launch)" if chosen else "(no candidate found; skipping)"
+        typer.echo(f"   Skipping real launch {note}")
+    typer.echo()
+
+    # Test 5: end_task (safe failure expected)
+    typer.echo("5. Testing end_task tool (safe test - non-existent process):")
+    result = execute_tool(
+        "end_task",
+        {
+            "identifier": "fake_process_that_doesnt_exist_12345",
+            "force": False,
+        },
+    )
     typer.echo(f"   Success: {result.get('success')}")
-    if not result.get('success'):
+    if not result.get("success"):
         typer.echo(f"   Expected Error: {result.get('error')}")
     typer.echo()
 
