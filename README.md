@@ -1,156 +1,273 @@
-# EdgePilot Architecture Overview
+# EdgePilot - AI Copilot Console
 
-![Screenshot](docs/assets/final_architecture.png)
+EdgePilot is an **on-premises AI copilot** that combines a lightweight FastAPI backend with an Electron desktop UI. It features **full MCP (Model Context Protocol) integration**, enabling Gemini to autonomously monitor your system, launch applications with scheduling, and manage processes through natural language.
 
-## Layers
+## Highlights
+- **🤖 MCP Integration** - Gemini can autonomously call tools for system monitoring, app launching, and process management
+- **📊 Real-time Metrics** - CPU, memory, disk, network monitoring with process-level details and executable paths
+- **🚀 Smart App Launcher** - Launch applications by name with delay support using Windows Start Menu search
+- **🎯 Smart Tool Calling** - LLM automatically decides when to gather metrics, launch apps, or end processes
+- **🖥️ Desktop UI** - Electron-based chat interface with dark theme
+- **🔌 Provider Abstraction** - Pluggable system supporting Gemini (with tools), Claude, and GPT
+- **💾 Local Persistence** - JSON-based chat history and usage analytics (privacy-first)
+- **⚡ Lightweight** - Clean codebase focused on core functionality
 
-### 1. User Side
-- **Install Wizard** collects deployment choices (Claude model, cluster vs. local, access) and lights up the Streamlit UI.
-- **Prompts** capture ad-hoc questions after setup; every prompt becomes an input for the planner.
+## Quick Start
 
-### 2. Frontend (Streamlit UI / CLI)
-- Orchestrates the human loop: sends questions to the planner, renders plan JSON, raw facts, and summarized answers.
-- Surfaces LLM usage/performance metrics emitted by the planner and summarizer alongside alert banners from the backend.
+### 1. Setup & Installation
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-### 3. Planner (Claude)
-- Translates natural language into strongly-typed plan JSON (`report`, `can_run`, `suggest_window`, `run_task`, etc.).
-- Validates schema compliance before the plan is returned to the UI and relayed to the API.
-- Emits latency, token, and error telemetry that feeds the LLM performance dashboard.
+# Configure your API key
+# Edit env/.env and add: GEMINI_API_KEY=your_key_here
 
-### 4. Backend
-- **FastAPI (`edgepilot.app`)** materializes plan steps: composes PromQL, coordinates task execution, and persists run context.
-- **Metric Reporting** aggregates resource usage and emits alerts when thresholds are exceeded.
-- **Usage Alerts** are generated from metric reports and forwarded to the UI for operator follow-up.
-- **LLM Performance & Metrics** tracks planner/summarizer behavior for observability.
+# Install Electron UI (one-time, requires Node.js 18+)
+cd ui && npm install && cd ..
+```
 
-### 5. Scheduling Backend
-- **Scheduling API (`edgepilot.schedulers`)** handles task submissions destined for optimized execution.
-- **Policy & Run History** captures prior job executions, chosen policies, and downstream outcomes for reuse.
-- **Workload Profiles (`/workloads/profile`)** expose time-bucketed resource summaries and contention hints to the optimizer loop.
-- **Policy Metadata API (`/policies/...`)** centralizes scheduler intents, guardrails, KPI history, and verification tokens for safe reuse.
-- **Job Run API (`/jobs/...`)** records per-task lifecycle events so workload profiles include recent history, status counts, and policy usage.
-- **Scheduler Assignment (`/scheduler/assign`)** chooses a policy for incoming jobs, logs assignments, and returns rationale plus alternatives.
+### 2. Run EdgePilot
+```bash
+# Launch the full application (API + Electron UI)
+python main.py
 
-### CLI Workflow (edgepilot/cli.py)
-- Select a policy for new jobs: `python -m edgepilot.cli assign --jobs '[{"job_id":"build-101","workload":"web-frontend"}]'`
-- Update job lifecycle events: `python -m edgepilot.cli job-update --job-id build-101 --workload web-frontend --status running --started-at $(date -u +"%Y-%m-%dT%H:%M:%SZ")`
-- Post batch KPIs to the policy store: `python -m edgepilot.cli policy-run --policy-id scx_rusty --kpis '{"p99_latency_ms":40,"throughput_rps":1250}'`
+# Or run API only:
+python main.py serve --host 127.0.0.1 --port 8000
+```
 
-### Python Integration (edgepilot/scheduler_service.py)
-- `SchedulerClient.assign_jobs()` wraps `/scheduler/assign` so controller code can fetch a policy recommendation in one call.
-- `SchedulerClient.update_job()` posts lifecycle events to `/jobs/run` whenever the scheduler starts, finishes, or retries work.
-- `SchedulerClient.record_policy_run()` pushes aggregated KPIs back into `/policies/{id}/runs` once batch metrics are available.
-- Run `python -m edgepilot.scheduler_service` for a small end-to-end smoke flow that exercises these helper methods.
-- For a longer fake workload, `python -m edgepilot.demo_scheduler` simulates batches, switching policies and streaming metrics automatically.
-- Built-in Linux tuning wrappers live in `edgepilot/policies/` (CFS latency tweaks, nice priority boost, CPU quota via cgroup). Ensure they are executable (`chmod +x edgepilot/policies/apply_*.sh`) and install prerequisites such as `sudo`, `cgexec` (package `cgroup-tools`), and passwordless sysctl access if needed.
+### 3. Test Tools
+```bash
+# Test all MCP tools integration
+python test_tools.py
 
-### Job Metrics Convention
-- When a job starts, the launcher sets two environment variables:
-  - `EDGE_JOB_METRICS_PATH` – absolute path where the job can write a JSON file containing KPIs (e.g. `{ "records_processed": 1234, "p99_ms": 42 }`).
-  - `EDGE_JOB_ARTIFACTS` – scratch directory created for the run; anything written here is kept for inspection.
-- Jobs can also emit a line to stdout formatted as `METRICS_JSON: {...}`; the launcher merges that JSON object into the recorded metrics.
-- Regardless of custom KPIs, the launcher always captures `duration_s`, `exit_code`, `stdout_bytes`, `stderr_bytes`, `started_at`, and `finished_at`.
-- These metrics are posted to `/jobs/run` and `/policies/{id}/runs`, so policy history now reflects more than just success/failure.
+# Test launcher directly
+python tools/launcher.py
+```
 
-### Mock Scheduler Service
-- `edgepilot/mock_scheduler.py` spins up a FastAPI service that accepts job submissions, calls `/scheduler/assign`, and updates job lifecycle state.
-- Start EdgePilot (`uvicorn edgepilot.app:app --reload --port 5057`), then run `uvicorn edgepilot.mock_scheduler:app --reload --port 5060`.
-- Submit work: `curl -X POST http://127.0.0.1:5060/jobs/submit -H 'content-type: application/json' -d '{"jobs":[{"job_id":"job-1","workload":"web-frontend"}]}'`
-- Advance jobs: `curl -X POST http://127.0.0.1:5060/jobs/job-1/start` then `curl -X POST http://127.0.0.1:5060/jobs/job-1/finish -H 'content-type: application/json' -d '{"metrics":{"p99_latency_ms":38}}'`
-- The mock service automatically posts to `/jobs/run` and `/policies/{id}/runs`, so the policy catalog learns without manual CLI steps.
-- The Streamlit scheduler tab lets you queue shell commands or uploaded Python scripts, execute them locally, and stream duration/exit-code metrics back into EdgePilot.
+### 4. Try It Out!
+Open the UI and try these prompts with **Gemini**:
 
-### 6. Systems / Exporters
-- **Prometheus, node_exporter, and cAdvisor** supply live system metrics that drive both reporting and scheduling analysis.
+**System Monitoring:**
+- "What's my current CPU and memory usage?"
+- "Show me the top 5 processes using the most CPU"
 
-### 7. Scheduler Optimizer (Claude)
-- Consumes current metrics plus historical policy data from the backend to synthesize an optimized scheduling strategy.
-- Returns policy updates to the EdgePilot API so upcoming tasks run with the recommended configuration.
+**Application Discovery:**
+- "What apps do I have installed?"
+- "Do I have Discord installed?"
+- "List all my games"
 
-### 8. Summarizer (Claude)
-- Consumes the original question, planner plan, and backend facts to craft the final narrative response.
-- Adds recommended actions, confidence notes, and response metrics that contribute to usage alerts.
+**Application Launching:**
+- "Launch notepad"
+- "Open Chrome in 30 seconds"
+- "Start Minecraft in 1 minute"
 
-## Data Flow Summary
-1. User installs EdgePilot, selects the Claude model, and launches the Streamlit UI/CLI.
-2. A prompt is sent to the planner LLM; validated plan JSON returns to the UI and is forwarded to the API.
-3. The FastAPI backend executes each step by issuing PromQL queries against Prometheus and streams execution signals to the scheduling API.
-4. The scheduling backend gathers policy/run history, augments it with fresh metrics, and hands the package to the optimizer LLM.
-5. The scheduler optimizer returns policy recommendations that the scheduling API applies to upcoming task requests.
-6. EdgePilot runs requested jobs using the optimized policy while logging run context, usage metrics, and alert signals.
-7. Planner and summarizer responses populate LLM performance metrics while the summarizer crafts the narrative answer and closes the loop with usage alerts.
+**Process Control:**
+- "Close all Chrome instances"
+- "End the notepad process"
 
-## Environment & Configuration
-- Credentials are managed via `.env` (`ANTHROPIC_API_KEY`, `CLAUDE_MODEL=claude-3-5-haiku-20241022`, `EDGE_BASE_URL`).
-- `infra/docker-compose.yml` runs Prometheus, exporters, Grafana, and EdgePilot dependencies locally.
-- `edgepilot/pipeline.py` houses reusable planner/executor/summarizer helpers leveraged by Streamlit and CLI flows.
+### Optional: Enable Prometheus Metrics
+EdgePilot can pull historical metrics from Prometheus when `PROM_URL` is set. A helper script downloads Prometheus, prepares a default config, installs node_exporter, and prints the commands to launch both services:
 
-## Streamlit Quick Start
+```bash
+chmod +x scripts/bootstrap_prometheus.sh
+./scripts/bootstrap_prometheus.sh   # follow the start instructions it prints
+```
 
-1. **Install prerequisites**
-   - Docker Desktop (Mac/Windows) or Docker Engine (Linux).
-   - Python 3.8+ (the repo ships with a virtualenv in `edgepilot/.venv`).
+After the script runs it updates `env/.env` with sensible defaults (`PROM_URL=http://localhost:9090`, `PROM_TIMEOUT_SEC=15`) and adds a `node` scrape job. You can launch/stop the metrics stack in the background at any time:
+```bash
+./scripts/bootstrap_prometheus.sh start   # starts Prometheus + node_exporter (logs in ~/.edgepilot/logs)
+./scripts/bootstrap_prometheus.sh status  # check running pids
+./scripts/bootstrap_prometheus.sh stop    # stop both services
+```
 
-2. **Clone the repository & enter the project**
-   ```bash
-   git clone <repo-url>
-   cd Practicum
-   ```
+Finally, restart the EdgePilot backend so it picks up the new environment variables. Queries like `report_edge_status(window="6h")` will then read from Prometheus instead of the local fallback.
 
-3. **Bootstrap the monitoring stack**
-   ```bash
-   docker-compose -f infra/docker-compose.yml pull
-   docker-compose -f infra/docker-compose.yml up -d
-   ```
-   This launches Prometheus, node-exporter, cAdvisor, Grafana, and Alertmanager on the `monitoring` network.
+## Environment Configuration
+Edit `env/.env`:
+```bash
+GEMINI_API_KEY=your_gemini_key        # Required for MCP tools
+ANTHROPIC_API_KEY=your_claude_key     # Optional
+OPENAI_API_KEY=your_openai_key        # Optional
+DEFAULT_PROVIDER=gemini               # Use gemini for tool calling
+```
 
-4. **Create / activate the virtual environment**
-   ```bash
-   python3 -m venv edgepilot/.venv   # skip if already checked in
-   source edgepilot/.venv/bin/activate
-   pip install -r edgepilot/requirements.txt
-   ```
+## Project Layout
+```
+EdgePilot/
+├── README.md
+├── requirements.txt
+├── test_tools.py            # MCP tools integration test
+├── main.py                  # FastAPI backend + CLI entry point
+├── ui/                      # Electron desktop application
+│   ├── index.html           # UI markup
+│   ├── renderer.js          # Frontend logic
+│   ├── styles.css           # Dark theme styling
+│   ├── main.js              # Electron main process
+│   └── package.json         # Node.js dependencies
+├── providers/               # LLM provider adapters
+│   ├── base.py              # BaseLLM protocol + ToolCall classes
+│   ├── gemini.py            # Gemini with function calling
+│   ├── claude.py            # Claude adapter
+│   └── gpt.py               # GPT placeholder
+├── tools/                   # System utilities exposed as tools
+│   ├── __init__.py          # Export metrics, scheduler, process helpers
+│   ├── metrics.py           # psutil + Prometheus-backed host reporting
+│   ├── scheduler.py         # Task registry + app launcher + shell/python runner
+│   └── end_task.py          # Process termination
+├── MCP/                     # Model Context Protocol integration
+│   ├── tool_schemas.py      # Function calling schemas for all 5 tools
+│   ├── tool_executor.py     # Tool execution engine
+│   └── README.md            # Full MCP documentation
+├── env/.env                 # API keys and configuration
+├── scripts/
+│   └── bootstrap_prometheus.sh  # Installs Prometheus + node_exporter and updates env/config
+└── data/                    # JSON persistence + blueprints
+    ├── chat_history.json    # Chat sessions
+    ├── usage_metrics.json   # API usage tracking
+    ├── tool_call_history.json  # Tool execution logs
+    ├── ring.edgepilot.json      # Metrics entity definitions
+    └── blueprint.edge_status.json # Edge status reporting plan
+```
 
-5. **Configure environment variables**
-   - Copy `.env` and populate:
-     ```bash
-     cp .env.example .env   # if provided; otherwise edit .env directly
-     ```
-   - Ensure the following variables are set (values shown for reference):
-     ```bash
-     export ANTHROPIC_API_KEY=sk-ant-...
-     export CLAUDE_MODEL=claude-3-5-haiku-20241022
-     export CLAUDE_MAX_TOKENS=1024
-     export EDGE_BASE_URL=http://127.0.0.1:5057
-     ```
-   - To load automatically: `set -a && source .env && set +a` before each session, or place the exports in `~/.zshrc`.
+## API Overview
+- `GET /api/providers` – enumerate providers and configuration status
+- `GET /api/chats` – list chat sessions with summary metadata
+- `POST /api/chats` – create a new chat session
+- `GET /api/chats/{chat_id}` – fetch full conversation history
+- `POST /api/chats/{chat_id}/messages` – send a prompt and get LLM response (with tool calling)
+- `GET /api/metrics` – retrieve current system metrics snapshot
 
-6. **Start the EdgePilot API**
-   ```bash
-   uvicorn edgepilot.app:app --reload --port 5057
-   ```
-   Leave this process running (or use a supervisor such as `pm2`/`honcho`).
+## MCP (Model Context Protocol)
 
-7. **Launch the Streamlit assistant** (new terminal, same venv/env)
-   ```bash
-   source edgepilot/.venv/bin/activate
-   set -a && source .env && set +a
-   streamlit run edgepilot/streamlit_app.py
-   ```
-   Open the URL shown in the terminal (`http://localhost:8501` by default).
+EdgePilot includes full MCP integration with **5 powerful tools** using launcher.py for intelligent app launching:
 
-8. **Optional: Grafana login**
-   - Navigate to `http://localhost:3000`
-   - Default credentials: `admin / admin123`
-   - Add Prometheus data source: `http://prometheus:9090`
+### Available Tools
 
-9. **Shut down services**
-   ```bash
-   docker-compose -f infra/docker-compose.yml down
-   ```
+#### 1. **gather_metrics** - System Monitoring
+Collects comprehensive system metrics including CPU, memory, disk, network, battery, and all running processes with executable paths.
 
-## Troubleshooting
+```python
+# LLM can call this automatically when user asks about system status
+gather_metrics(top_n=10, all_processes=False)
+```
 
-- `ModuleNotFoundError: edgepilot` when running Streamlit: ensure `edgepilot/streamlit_app.py` is invoked from project root (it adjusts `sys.path`), and the venv is active.
-- Prometheus can’t reach Alertmanager: confirm the container is running (`docker ps`) and `prometheus/prometheus.yml` targets `alertmanager:9093`.
-- Claude API errors (`model not found`, `missing API key`): double-check `.env` values and run `echo $ANTHROPIC_API_KEY` before launching the apps.
+#### 2. **launch** - Application Launcher with Scheduling
+Launch applications by name with optional delay. Uses Windows Start Menu search and Microsoft Store app discovery.
+
+```python
+# LLM calls this when user wants to launch an app
+launch(app_name="chrome", delay_seconds=0)
+launch(app_name="minecraft", delay_seconds=30)  # Launch in 30 seconds
+```
+
+**Features:**
+- Searches Windows Start Menu shortcuts
+- Finds Microsoft Store/UWP apps
+- Supports delayed execution with threading
+- Simple app names (no paths needed)
+
+#### 3. **search** - Application Discovery
+Search for installed applications by name. Returns list of matching apps found in Start Menu and Microsoft Store.
+
+```python
+# LLM calls this to check if an app is installed
+search(app_name="discord")  # Returns: ["Discord"]
+search(app_name="game")     # Returns: ["Game Bar", "Steam", ...]
+```
+
+#### 4. **list_apps** - Browse Installed Applications
+List all installed applications with optional filtering. Perfect for "what apps do I have?" queries.
+
+```python
+# LLM calls this to browse available apps
+list_apps(filter_term="")       # Returns all apps
+list_apps(filter_term="game")   # Returns only apps with "game" in name
+```
+
+#### 5. **end_task** - Process Termination
+Terminates processes by name, path, or command line identifier.
+
+```python
+# LLM calls this when user wants to close an app
+end_task(identifier="chrome", force=False)
+end_task(identifier="notepad", force=True)
+```
+
+### How It Works
+1. User sends a message in natural language
+2. Gemini analyzes the request and decides which tools to call
+3. Tools are executed automatically (e.g., launching apps, gathering metrics)
+4. Results are fed back to Gemini
+5. Gemini formulates a human-readable response
+
+**Example 1: System Monitoring**
+```
+User: "Show me what's using the most CPU"
+→ Gemini calls gather_metrics(top_n=3)
+→ Receives: {processes: [{name: "chrome.exe", cpu: 15.2%, ...}]}
+→ Responds: "Chrome is using the most CPU at 15.2%..."
+```
+
+**Example 2: Scheduled App Launch**
+```
+User: "Launch Minecraft in 30 seconds"
+→ Gemini calls launch(app_name="minecraft", delay_seconds=30)
+→ Receives: {success: true, message: "Scheduled 'minecraft' to launch in 30 seconds"}
+→ Responds: "I've scheduled Minecraft to launch in 30 seconds!"
+```
+
+**Example 3: App Discovery**
+```
+User: "What games do I have?"
+→ Gemini calls list_apps(filter_term="game")
+→ Receives: {count: 3, apps: ["Game Bar", "Steam", "Minecraft"]}
+→ Responds: "You have 3 games installed: Game Bar, Steam, and Minecraft"
+```
+
+### Adding Your Own Tools
+See `MCP/README.md` for the complete guide. It's a simple 5-step process:
+1. Create tool function in `tools/`
+2. Export it in `tools/__init__.py`
+3. Add schema to `MCP/tool_schemas.py`
+4. Add executor in `MCP/tool_executor.py`
+5. Restart and test!
+
+## Testing & Utilities
+```bash
+# Test all MCP tools integration
+python test_tools.py
+
+# Test launcher directly (launches notepad, chrome, minecraft)
+python tools/launcher.py
+
+# Run modules directly
+python -c "from tools import gather_metrics; print(gather_metrics(top_n=5))"
+python -c "from tools import search; print(search('chrome'))"
+python -c "from tools import list_apps; print(list_apps('game'))"
+```
+
+## Extending Providers
+1. Add a module under `providers/` implementing the `BaseLLM` protocol
+2. Register it in `providers/__init__.py`
+3. Add environment variables for API keys/models
+4. For tool support, implement `enable_tools()` and parse `tool_calls` in responses
+
+## Key Features Powered by launcher.py
+
+EdgePilot's application launching is powered by `launcher.py`, which provides:
+
+1. **Windows Start Menu Search** - Searches .lnk shortcuts in user and system Start Menu locations
+2. **Microsoft Store Apps** - Discovers and launches UWP/Store apps via PowerShell
+3. **Delayed Execution** - Background threading for scheduled launches
+4. **Intelligent Fallback** - Falls back to Windows `start` command for built-in apps
+5. **Simple API** - Just 3 core functions: `launch()`, `search()`, `list_apps()`
+
+The LLM can use simple app names like "chrome", "minecraft", or "notepad" without needing full paths!
+
+## Documentation
+- **`README.md`** (this file) - Quick start and overview
+- **`MCP/README.md`** - Complete MCP integration guide
+- **`tools/launcher.py`** - Application launcher implementation with detailed documentation
+
+## License
+MIT License - See LICENSE file for details

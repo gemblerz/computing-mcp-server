@@ -1,9 +1,0 @@
-route:
-  receiver: 'default'
-  group_by: ['alertname']
-
-receivers:
-  - name: 'default'
-    webhook_configs:
-      - url: 'http://localhost:5001/alert'
-        send_resolved: true

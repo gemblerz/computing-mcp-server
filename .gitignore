@@ -1,12 +1,23 @@
-# General
-.DS_Store
+# ignore virtual environments
+edgepilot_environment/
+.venv
+
+# Ignore all node_modules folders
+node_modules/
+
+# Ignore all __pycache__ folders and .pyc files
 __pycache__/
 *.pyc
-.streamlit/
-.venv/
-edgepilot/.venv/
-.env
 
-# EdgePilot artifacts
-edgepilot/edgepilot_mcp.log
-edgepilot/*.log
+# Ignore configs
+.vscode
+.claude
+
+# Ignore Chat History
+data/chat_history.json
+data/tool_call_history.json
+data/usage_metrics.json
+data/task_history.json
+
+# Ignore api keys
+env/.env 
